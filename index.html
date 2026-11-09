@@ -79,7 +79,6 @@
     inset: 0;
     display: none;
     place-items: center;
-    color: #fff;
     font-size: clamp(2rem, 12vmin, 8rem);
     letter-spacing: 0.02em;
     text-align: center;
@@ -127,7 +126,7 @@
   <div class="aurora" aria-hidden="true"></div>
   <canvas id="stage" aria-hidden="true"></canvas>
   <h1 class="fallback">ТЫ кто?</h1>
-  <div class="hint" id="hint" aria-hidden="true">коснись — и всё разлетится</div>
+  <div class="hint" id="hint" aria-hidden="true">коснись — и всё изменится</div>
   <div class="grain" aria-hidden="true"></div>
   <div class="vignette" aria-hidden="true"></div>
 
@@ -147,6 +146,7 @@
 
   var TEXT = "ТЫ кто?";
   var FONT = '"Rubik Mono One", sans-serif';
+  var shape = "text"; // "text" | "doodle"
 
   /* ---------- свечения-спрайты по оттенкам ---------- */
   var HUE_STEPS = 36;
@@ -170,16 +170,15 @@
 
   /* ---------- частицы ---------- */
   var particles = [];
-  var SPRITE = 64;
 
-  function Particle(tx, ty, hue) {
+  function Particle(tx, ty, fromX, fromY) {
     this.tx = tx; this.ty = ty;
-    this.hue = hue;
+    this.hue = (tx / Math.max(1, W)) * 300 + 20;
     this.phase = Math.random() * Math.PI * 2;
     this.wSpeed = 0.5 + Math.random() * 1.5;
-    // стартуем из случайной точки экрана — текст слетается из ниоткуда
-    this.x = Math.random() * W;
-    this.y = Math.random() * H;
+    // стартовая точка: извне или рядом со старой позицией
+    this.x = fromX !== undefined ? fromX : Math.random() * W;
+    this.y = fromY !== undefined ? fromY : Math.random() * H;
     this.vx = 0;
     this.vy = 0;
     this.size = 2.5 + Math.random() * 3.5;
@@ -197,6 +196,9 @@
   window.addEventListener("pointerdown", function (e) {
     setPointer(e);
     explode(e.clientX, e.clientY);
+    // каждый клик переключает фигуру: текст <-> рисунок
+    shape = (shape === "text") ? "doodle" : "text";
+    retarget();
   }, { passive: true });
   window.addEventListener("pointerleave", function () { pointer.active = false; });
 
@@ -211,13 +213,10 @@
     }
   }
 
-  /* ---------- сборка цели из текста ---------- */
-  function buildTargets() {
-    var off = document.createElement("canvas");
-    off.width = W; off.height = H;
-    var g = off.getContext("2d");
+  /* ---------- отрисовка фигур в оффскрин-канвас ---------- */
 
-    // подгоняем кегль под ширину экрана
+  // текст «ТЫ кто?»
+  function drawText(g) {
     var size = H * 0.3;
     g.font = "400 " + size + "px " + FONT;
     var tw = g.measureText(TEXT).width;
@@ -228,7 +227,51 @@
     g.textBaseline = "middle";
     g.fillStyle = "#fff";
     g.fillText(TEXT, W / 2, H / 2);
+  }
 
+  // мультяшная фигура из простых форм
+  function drawDoodle(g) {
+    var cx = W / 2;
+    var cy = H / 2;
+    var TH = Math.min(H * 0.5, W * 1.1);   // общая высота фигуры
+    var SW = TH * 0.42;                     // ширина ствола
+
+    var headCy = cy - TH * 0.38;
+    var shaftTop = cy - TH * 0.24;
+    var shaftBot = cy + TH * 0.16;
+    var ballCy = cy + TH * 0.30;
+
+    g.fillStyle = "#fff";
+    g.strokeStyle = "#fff";
+    g.lineWidth = SW * 0.18;
+    g.lineJoin = "round";
+
+    // головка
+    g.beginPath();
+    g.ellipse(cx, headCy, SW * 0.55, TH * 0.14, 0, 0, Math.PI * 2);
+    g.fill();
+
+    // ствол
+    g.beginPath();
+    g.rect(cx - SW / 2, shaftTop, SW, shaftBot - shaftTop);
+    g.fill();
+
+    // основание — скругление перехода
+    g.beginPath();
+    g.ellipse(cx, shaftBot, SW / 2, TH * 0.05, 0, 0, Math.PI * 2);
+    g.fill();
+
+    // яйца — два круга
+    g.beginPath();
+    g.arc(cx - SW * 0.62, ballCy, SW * 0.58, 0, Math.PI * 2);
+    g.fill();
+    g.beginPath();
+    g.arc(cx + SW * 0.62, ballCy, SW * 0.58, 0, Math.PI * 2);
+    g.fill();
+  }
+
+  // сэмплирование альфы в список точек-целей
+  function sampleTargets(g) {
     var data = g.getImageData(0, 0, W, H).data;
     var maxCount = Math.min(4200, Math.max(600, Math.floor(W * H / 320)));
 
@@ -246,10 +289,34 @@
       step++;
     } while (targets.length > maxCount && step < 12);
 
-    particles = targets.map(function (t) {
-      var hue = (t[0] / W) * 300 + 20;
-      return new Particle(t[0], t[1], hue);
-    });
+    return targets;
+  }
+
+  // перестроить цели под текущую фигуру, сохранив позиции частиц
+  function retarget() {
+    var off = document.createElement("canvas");
+    off.width = W; off.height = H;
+    var g = off.getContext("2d");
+    if (shape === "doodle") drawDoodle(g); else drawText(g);
+    var targets = sampleTargets(g);
+
+    var i;
+    for (i = 0; i < particles.length && i < targets.length; i++) {
+      particles[i].tx = targets[i][0];
+      particles[i].ty = targets[i][1];
+      particles[i].hue = (targets[i][0] / Math.max(1, W)) * 300 + 20;
+    }
+    // недостающие частицы влетают извне экрана
+    for (; i < targets.length; i++) {
+      var edge = Math.floor(Math.random() * 4);
+      var fromX = edge === 0 ? -50 : edge === 1 ? W + 50 : Math.random() * W;
+      var fromY = edge === 2 ? -50 : edge === 3 ? H + 50 : Math.random() * H;
+      particles.push(new Particle(targets[i][0], targets[i][1], fromX, fromY));
+    }
+    // лишние убираем
+    if (particles.length > targets.length) {
+      particles.length = targets.length;
+    }
   }
 
   function resize() {
@@ -263,7 +330,8 @@
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
     ctx.fillStyle = "#050507";
     ctx.fillRect(0, 0, W, H);
-    buildTargets();
+    particles = [];
+    retarget();
   }
 
   var resizeTimer = null;
@@ -274,7 +342,7 @@
 
   /* ---------- главный цикл ---------- */
   var t = 0;
-  var HUE_DRIFT = 0.02; // радуга медленно ползёт по буквам
+  var HUE_DRIFT = 0.02;
   var SPRING = 0.012;
   var FRICTION = 0.9;
   var REPEL_R = 110;
@@ -292,7 +360,7 @@
     for (var i = 0; i < particles.length; i++) {
       var p = particles[i];
 
-      // пружина к букве
+      // пружина к цели
       p.vx += (p.tx - p.x) * SPRING;
       p.vy += (p.ty - p.y) * SPRING;
 
@@ -313,13 +381,12 @@
       p.x += p.vx;
       p.y += p.vy;
 
-      // лёгкое дыхание вокруг буквы
       var wob = Math.sin(t * p.wSpeed + p.phase) * 1.4;
 
-      var hue = (p.hue + t * 22 * HUE_DRIFT * 50) % 360;
+      var hue = (p.hue + t * HUE_DRIFT * 50) % 360;
       var sprite = sprites[Math.floor(hue / 360 * HUE_STEPS) % HUE_STEPS];
       var drawSize = p.size * 7 + wob * 2;
-      var tw = 0.65 + 0.35 * Math.sin(t * 3 + p.phase * 2); // мерцание
+      var tw = 0.65 + 0.35 * Math.sin(t * 3 + p.phase * 2);
 
       ctx.globalAlpha = tw;
       ctx.drawImage(sprite,
