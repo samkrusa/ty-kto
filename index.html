@@ -3,61 +3,222 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0b0b0d">
+<meta name="theme-color" content="#050507">
 <title>ТЫ кто?</title>
 <style>
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
 
-  html,
-  body {
+  html, body {
     height: 100%;
     width: 100%;
     overflow: hidden;
   }
 
   body {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #0b0b0d;
-    color: #f5f5f7;
+    background: #050507;
+    display: grid;
+    place-items: center;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     -webkit-tap-highlight-color: transparent;
-    -webkit-text-size-adjust: 100%;
+    cursor: default;
   }
 
+  /* ---------- фоновые слои ---------- */
+
+  /* тёплое свечение в центре, которое медленно дышит */
+  .aurora {
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(60vmax 60vmax at 50% 55%,
+        rgba(168, 119, 255, 0.16) 0%,
+        rgba(255, 74, 110, 0.10) 35%,
+        transparent 70%);
+    animation: aurora-drift 14s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+
+  @keyframes aurora-drift {
+    0%   { transform: scale(1) translate(0, 0); opacity: 0.8; }
+    100% { transform: scale(1.15) translate(3%, -4%); opacity: 1; }
+  }
+
+  /* курсорный свет — включается скриптом только на устройствах с мышью */
+  .spotlight {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(28vmax 28vmax at var(--mx, 50%) var(--my, 40%),
+      rgba(255, 255, 255, 0.07) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.6s ease;
+    pointer-events: none;
+  }
+
+  /* зерно */
+  .grain {
+    position: fixed;
+    inset: -100%;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
+    opacity: 0.055;
+    animation: grain-shift 0.9s steps(4) infinite;
+    pointer-events: none;
+  }
+
+  @keyframes grain-shift {
+    0%   { transform: translate(0, 0); }
+    25%  { transform: translate(-2%, 1%); }
+    50%  { transform: translate(1%, -2%); }
+    75%  { transform: translate(-1%, -1%); }
+    100% { transform: translate(2%, 2%); }
+  }
+
+  /* тонкая виньетка по краям */
+  .vignette {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(120% 120% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.75) 100%);
+    pointer-events: none;
+  }
+
+  /* ---------- текст ---------- */
+
   .question {
-    /* масштабируется от ширины экрана и от высоты, чтобы влезало и на телефоне, и на ПК */
-    font-size: clamp(2rem, 18vmin, 22rem);
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: -0.03em;
+    position: relative;
+    font-size: clamp(2.2rem, 16vmin, 18rem);
+    font-weight: 900;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
     text-align: center;
-    white-space: nowrap;
     padding: 0 4vmin;
-    background: linear-gradient(180deg, #ffffff 0%, #a9a9b8 100%);
+    white-space: nowrap;
+    user-select: none;
+    perspective: 800px;
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+
+  .word {
+    display: inline-block;
+  }
+
+  /* буквы появляются по очереди из глубины */
+  .word > span {
+    display: inline-block;
+    background: linear-gradient(175deg, #ffffff 20%, #c9c9d6 55%, #7a7a8c 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    user-select: none;
-    animation: breathe 6s ease-in-out infinite;
+    text-shadow: 0 0 80px rgba(255, 255, 255, 0.12);
+    opacity: 0;
+    transform: translateY(0.35em) rotateX(45deg) scale(0.9);
+    animation: letter-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
 
-  @keyframes breathe {
-    0%, 100% { opacity: 0.85; transform: scale(1); }
-    50%      { opacity: 1;    transform: scale(1.02); }
+  @keyframes letter-in {
+    to {
+      opacity: 1;
+      transform: translateY(0) rotateX(0deg) scale(1);
+    }
+  }
+
+  /* мягкое свечение позади текста */
+  .question::before {
+    content: "";
+    position: absolute;
+    inset: -20% -10%;
+    background: radial-gradient(closest-side, rgba(200, 160, 255, 0.20), transparent);
+    filter: blur(40px);
+    z-index: -1;
+    animation: halo-pulse 5s ease-in-out infinite;
+  }
+
+  @keyframes halo-pulse {
+    0%, 100% { opacity: 0.55; }
+    50%      { opacity: 1; }
+  }
+
+  /* подчёркивающая линия под вопросом */
+  .underline {
+    position: fixed;
+    left: 50%;
+    bottom: 14vh;
+    width: min(30vw, 220px);
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+    transform: translateX(-50%) scaleX(0);
+    animation: line-grow 1.2s 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  @keyframes line-grow {
+    to { transform: translateX(-50%) scaleX(1); }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .question { animation: none; }
+    .aurora, .grain, .question::before, .underline { animation: none; }
+    .word > span {
+      animation: none;
+      opacity: 1;
+      transform: none;
+    }
+    .underline { transform: translateX(-50%) scaleX(1); }
   }
 </style>
 </head>
 <body>
-  <h1 class="question">ТЫ кто?</h1>
+  <div class="aurora" aria-hidden="true"></div>
+  <div class="spotlight" id="spotlight" aria-hidden="true"></div>
+  <h1 class="question" id="question" aria-label="ТЫ кто?"></h1>
+  <div class="underline" aria-hidden="true"></div>
+  <div class="grain" aria-hidden="true"></div>
+  <div class="vignette" aria-hidden="true"></div>
+
+<script>
+  // раскладываем текст на буквы с каскадной задержкой
+  (function () {
+    var q = document.getElementById("question");
+    var words = ["ТЫ", "кто?"];
+    var delay = 0.15;
+    words.forEach(function (word, wi) {
+      var w = document.createElement("span");
+      w.className = "word";
+      if (wi > 0) w.style.marginLeft = "0.25em";
+      word.split("").forEach(function (ch) {
+        var s = document.createElement("span");
+        s.textContent = ch;
+        s.style.animationDelay = delay.toFixed(2) + "s";
+        delay += 0.07;
+        w.appendChild(s);
+      });
+      q.appendChild(w);
+    });
+
+    // курсорный свет + лёгкий поворот текста к курсору — только для мыши
+    var fine = window.matchMedia("(pointer: fine)").matches;
+    var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (fine && !reduced) {
+      var spot = document.getElementById("spotlight");
+      var raf = null, tx = 0, ty = 0, cx = 0.5, cy = 0.4;
+
+      window.addEventListener("mousemove", function (e) {
+        tx = e.clientX / window.innerWidth;
+        ty = e.clientY / window.innerHeight;
+        if (spot.style.opacity !== "1") spot.style.opacity = "1";
+        if (!raf) raf = requestAnimationFrame(tick);
+      }, { passive: true });
+
+      function tick() {
+        cx += (tx - cx) * 0.08;
+        cy += (ty - cy) * 0.08;
+        spot.style.setProperty("--mx", (cx * 100).toFixed(2) + "%");
+        spot.style.setProperty("--my", (cy * 100).toFixed(2) + "%");
+        q.style.transform =
+          "rotateY(" + ((cx - 0.5) * 6).toFixed(2) + "deg) " +
+          "rotateX(" + ((0.5 - cy) * 4).toFixed(2) + "deg)";
+        var moved = Math.abs(tx - cx) > 0.001 || Math.abs(ty - cy) > 0.001;
+        raf = moved ? requestAnimationFrame(tick) : null;
+      }
+    }
+  })();
+</script>
 </body>
 </html>
