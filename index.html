@@ -146,7 +146,6 @@
 
   var TEXT = "ТЫ кто?";
   var FONT = '"Rubik Mono One", sans-serif';
-  var shape = "text"; // "text" | "doodle"
 
   /* ---------- свечения-спрайты по оттенкам ---------- */
   var HUE_STEPS = 36;
@@ -196,9 +195,6 @@
   window.addEventListener("pointerdown", function (e) {
     setPointer(e);
     explode(e.clientX, e.clientY);
-    // каждый клик переключает фигуру: текст <-> рисунок
-    shape = (shape === "text") ? "doodle" : "text";
-    retarget();
   }, { passive: true });
   window.addEventListener("pointerleave", function () { pointer.active = false; });
 
@@ -215,9 +211,9 @@
 
   /* ---------- отрисовка фигур в оффскрин-канвас ---------- */
 
-  // текст «ТЫ кто?»
+  // текст «ТЫ кто?» — в верхней половине экрана
   function drawText(g) {
-    var size = H * 0.3;
+    var size = H * 0.16;
     g.font = "400 " + size + "px " + FONT;
     var tw = g.measureText(TEXT).width;
     var maxW = W * 0.88;
@@ -226,20 +222,20 @@
     g.textAlign = "center";
     g.textBaseline = "middle";
     g.fillStyle = "#fff";
-    g.fillText(TEXT, W / 2, H / 2);
+    g.fillText(TEXT, W / 2, H * 0.34);
   }
 
-  // мультяшная фигура из простых форм
+  // мультяшная фигура внизу экрана
   function drawDoodle(g) {
     var cx = W / 2;
-    var cy = H / 2;
-    var TH = Math.min(H * 0.5, W * 1.1);   // общая высота фигуры
+    var TH = Math.min(H * 0.34, W * 0.6);  // высота фигуры в нижней зоне
     var SW = TH * 0.42;                     // ширина ствола
 
-    var headCy = cy - TH * 0.38;
-    var shaftTop = cy - TH * 0.24;
-    var shaftBot = cy + TH * 0.16;
-    var ballCy = cy + TH * 0.30;
+    var base = H * 0.92;                    // нижняя граница фигуры
+    var headCy = base - TH * 0.86;
+    var shaftTop = base - TH * 0.76;
+    var shaftBot = base - TH * 0.3;
+    var ballCy = base - TH * 0.14;
 
     g.fillStyle = "#fff";
     g.strokeStyle = "#fff";
@@ -292,12 +288,13 @@
     return targets;
   }
 
-  // перестроить цели под текущую фигуру, сохранив позиции частиц
+  // обе фигуры рисуются одновременно: текст + фигура внизу
   function retarget() {
     var off = document.createElement("canvas");
     off.width = W; off.height = H;
     var g = off.getContext("2d");
-    if (shape === "doodle") drawDoodle(g); else drawText(g);
+    drawText(g);
+    drawDoodle(g);
     var targets = sampleTargets(g);
 
     var i;
