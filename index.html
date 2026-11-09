@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#050507">
 <title>ТЫ кто?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik+Mono+One&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -16,51 +19,43 @@
 
   body {
     background: #050507;
-    display: grid;
-    place-items: center;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-family: "Rubik Mono One", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-tap-highlight-color: transparent;
-    cursor: default;
+    touch-action: none;
+    cursor: crosshair;
   }
 
-  /* ---------- фоновые слои ---------- */
+  /* ---------- фоновая подсветка ---------- */
 
-  /* тёплое свечение в центре, которое медленно дышит */
   .aurora {
     position: fixed;
     inset: 0;
     background:
-      radial-gradient(60vmax 60vmax at 50% 55%,
-        rgba(168, 119, 255, 0.16) 0%,
-        rgba(255, 74, 110, 0.10) 35%,
-        transparent 70%);
-    animation: aurora-drift 14s ease-in-out infinite alternate;
+      radial-gradient(55vmax 55vmax at 25% 20%, rgba(120, 60, 255, 0.18), transparent 65%),
+      radial-gradient(50vmax 50vmax at 80% 85%, rgba(255, 40, 100, 0.14), transparent 65%),
+      radial-gradient(60vmax 60vmax at 60% 50%, rgba(0, 180, 255, 0.10), transparent 70%);
+    animation: hue-drift 20s linear infinite;
     pointer-events: none;
   }
 
-  @keyframes aurora-drift {
-    0%   { transform: scale(1) translate(0, 0); opacity: 0.8; }
-    100% { transform: scale(1.15) translate(3%, -4%); opacity: 1; }
+  @keyframes hue-drift {
+    0%   { filter: hue-rotate(0deg); }
+    100% { filter: hue-rotate(360deg); }
   }
 
-  /* курсорный свет — включается скриптом только на устройствах с мышью */
-  .spotlight {
+  .vignette {
     position: fixed;
     inset: 0;
-    background: radial-gradient(28vmax 28vmax at var(--mx, 50%) var(--my, 40%),
-      rgba(255, 255, 255, 0.07) 0%, transparent 60%);
-    opacity: 0;
-    transition: opacity 0.6s ease;
+    background: radial-gradient(130% 130% at 50% 50%, transparent 50%, rgba(0, 0, 0, 0.85) 100%);
     pointer-events: none;
   }
 
-  /* зерно */
   .grain {
     position: fixed;
     inset: -100%;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
-    opacity: 0.055;
-    animation: grain-shift 0.9s steps(4) infinite;
+    opacity: 0.05;
+    animation: grain-shift 0.8s steps(4) infinite;
     pointer-events: none;
   }
 
@@ -72,153 +67,285 @@
     100% { transform: translate(2%, 2%); }
   }
 
-  /* тонкая виньетка по краям */
-  .vignette {
+  canvas#stage {
     position: fixed;
     inset: 0;
-    background: radial-gradient(120% 120% at 50% 50%, transparent 55%, rgba(0, 0, 0, 0.75) 100%);
-    pointer-events: none;
+    display: block;
   }
 
-  /* ---------- текст ---------- */
-
-  .question {
-    position: relative;
-    font-size: clamp(2.2rem, 16vmin, 18rem);
-    font-weight: 900;
-    line-height: 0.95;
-    letter-spacing: -0.02em;
+  /* запасной текст для скринридеров и reduced-motion */
+  .fallback {
+    position: fixed;
+    inset: 0;
+    display: none;
+    place-items: center;
+    color: #fff;
+    font-size: clamp(2rem, 12vmin, 8rem);
+    letter-spacing: 0.02em;
     text-align: center;
     padding: 0 4vmin;
-    white-space: nowrap;
-    user-select: none;
-    perspective: 800px;
-    transform-style: preserve-3d;
-    will-change: transform;
-  }
-
-  .word {
-    display: inline-block;
-  }
-
-  /* буквы появляются по очереди из глубины */
-  .word > span {
-    display: inline-block;
-    background: linear-gradient(175deg, #ffffff 20%, #c9c9d6 55%, #7a7a8c 100%);
+    background: linear-gradient(180deg, #fff, #8a8aa0);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
-    text-shadow: 0 0 80px rgba(255, 255, 255, 0.12);
-    opacity: 0;
-    transform: translateY(0.35em) rotateX(45deg) scale(0.9);
-    animation: letter-in 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   }
 
-  @keyframes letter-in {
-    to {
-      opacity: 1;
-      transform: translateY(0) rotateX(0deg) scale(1);
-    }
-  }
+  body.reduced .fallback { display: grid; }
+  body.reduced canvas#stage,
+  body.reduced .aurora,
+  body.reduced .grain { display: none; }
 
-  /* мягкое свечение позади текста */
-  .question::before {
-    content: "";
-    position: absolute;
-    inset: -20% -10%;
-    background: radial-gradient(closest-side, rgba(200, 160, 255, 0.20), transparent);
-    filter: blur(40px);
-    z-index: -1;
-    animation: halo-pulse 5s ease-in-out infinite;
-  }
-
-  @keyframes halo-pulse {
-    0%, 100% { opacity: 0.55; }
-    50%      { opacity: 1; }
-  }
-
-  /* подчёркивающая линия под вопросом */
-  .underline {
+  /* подсказка снизу */
+  .hint {
     position: fixed;
     left: 50%;
-    bottom: 14vh;
-    width: min(30vw, 220px);
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
-    transform: translateX(-50%) scaleX(0);
-    animation: line-grow 1.2s 1.4s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+    bottom: 6vh;
+    transform: translateX(-50%);
+    color: rgba(255, 255, 255, 0.35);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: clamp(0.7rem, 2.2vmin, 1rem);
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    animation: hint-fade 3s 2s both;
+    pointer-events: none;
   }
 
-  @keyframes line-grow {
-    to { transform: translateX(-50%) scaleX(1); }
+  @keyframes hint-fade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
+
+  body.reduced .hint { animation: none; opacity: 1; }
 
   @media (prefers-reduced-motion: reduce) {
-    .aurora, .grain, .question::before, .underline { animation: none; }
-    .word > span {
-      animation: none;
-      opacity: 1;
-      transform: none;
-    }
-    .underline { transform: translateX(-50%) scaleX(1); }
+    .grain, .aurora { animation: none; }
   }
 </style>
 </head>
 <body>
   <div class="aurora" aria-hidden="true"></div>
-  <div class="spotlight" id="spotlight" aria-hidden="true"></div>
-  <h1 class="question" id="question" aria-label="ТЫ кто?"></h1>
-  <div class="underline" aria-hidden="true"></div>
+  <canvas id="stage" aria-hidden="true"></canvas>
+  <h1 class="fallback">ТЫ кто?</h1>
+  <div class="hint" id="hint" aria-hidden="true">коснись — и всё разлетится</div>
   <div class="grain" aria-hidden="true"></div>
   <div class="vignette" aria-hidden="true"></div>
 
 <script>
-  // раскладываем текст на буквы с каскадной задержкой
-  (function () {
-    var q = document.getElementById("question");
-    var words = ["ТЫ", "кто?"];
-    var delay = 0.15;
-    words.forEach(function (word, wi) {
-      var w = document.createElement("span");
-      w.className = "word";
-      if (wi > 0) w.style.marginLeft = "0.25em";
-      word.split("").forEach(function (ch) {
-        var s = document.createElement("span");
-        s.textContent = ch;
-        s.style.animationDelay = delay.toFixed(2) + "s";
-        delay += 0.07;
-        w.appendChild(s);
-      });
-      q.appendChild(w);
-    });
+(function () {
+  "use strict";
 
-    // курсорный свет + лёгкий поворот текста к курсору — только для мыши
-    var fine = window.matchMedia("(pointer: fine)").matches;
-    var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (fine && !reduced) {
-      var spot = document.getElementById("spotlight");
-      var raf = null, tx = 0, ty = 0, cx = 0.5, cy = 0.4;
+  var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduced) {
+    document.body.classList.add("reduced");
+    return;
+  }
 
-      window.addEventListener("mousemove", function (e) {
-        tx = e.clientX / window.innerWidth;
-        ty = e.clientY / window.innerHeight;
-        if (spot.style.opacity !== "1") spot.style.opacity = "1";
-        if (!raf) raf = requestAnimationFrame(tick);
-      }, { passive: true });
+  var cvs = document.getElementById("stage");
+  var ctx = cvs.getContext("2d");
+  var W = 0, H = 0, DPR = 1;
 
-      function tick() {
-        cx += (tx - cx) * 0.08;
-        cy += (ty - cy) * 0.08;
-        spot.style.setProperty("--mx", (cx * 100).toFixed(2) + "%");
-        spot.style.setProperty("--my", (cy * 100).toFixed(2) + "%");
-        q.style.transform =
-          "rotateY(" + ((cx - 0.5) * 6).toFixed(2) + "deg) " +
-          "rotateX(" + ((0.5 - cy) * 4).toFixed(2) + "deg)";
-        var moved = Math.abs(tx - cx) > 0.001 || Math.abs(ty - cy) > 0.001;
-        raf = moved ? requestAnimationFrame(tick) : null;
-      }
+  var TEXT = "ТЫ кто?";
+  var FONT = '"Rubik Mono One", sans-serif';
+
+  /* ---------- свечения-спрайты по оттенкам ---------- */
+  var HUE_STEPS = 36;
+  var sprites = [];
+  (function makeSprites() {
+    for (var i = 0; i < HUE_STEPS; i++) {
+      var h = i * (360 / HUE_STEPS);
+      var s = document.createElement("canvas");
+      s.width = s.height = 64;
+      var g = s.getContext("2d");
+      var grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+      grad.addColorStop(0, "rgba(255,255,255,1)");
+      grad.addColorStop(0.25, "hsla(" + h + ",95%,72%,0.9)");
+      grad.addColorStop(0.6, "hsla(" + h + ",95%,60%,0.25)");
+      grad.addColorStop(1, "hsla(" + h + ",95%,55%,0)");
+      g.fillStyle = grad;
+      g.fillRect(0, 0, 64, 64);
+      sprites.push(s);
     }
   })();
+
+  /* ---------- частицы ---------- */
+  var particles = [];
+  var SPRITE = 64;
+
+  function Particle(tx, ty, hue) {
+    this.tx = tx; this.ty = ty;
+    this.hue = hue;
+    this.phase = Math.random() * Math.PI * 2;
+    this.wSpeed = 0.5 + Math.random() * 1.5;
+    // стартуем из случайной точки экрана — текст слетается из ниоткуда
+    this.x = Math.random() * W;
+    this.y = Math.random() * H;
+    this.vx = 0;
+    this.vy = 0;
+    this.size = 2.5 + Math.random() * 3.5;
+  }
+
+  /* ---------- указатель ---------- */
+  var pointer = { x: -1e9, y: -1e9, active: false };
+
+  function setPointer(e) {
+    pointer.x = e.clientX;
+    pointer.y = e.clientY;
+    pointer.active = true;
+  }
+  window.addEventListener("pointermove", setPointer, { passive: true });
+  window.addEventListener("pointerdown", function (e) {
+    setPointer(e);
+    explode(e.clientX, e.clientY);
+  }, { passive: true });
+  window.addEventListener("pointerleave", function () { pointer.active = false; });
+
+  function explode(px, py) {
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+      var dx = p.x - px, dy = p.y - py;
+      var d = Math.max(20, Math.sqrt(dx * dx + dy * dy));
+      var force = 2200 / d;
+      p.vx += (dx / d) * force;
+      p.vy += (dy / d) * force;
+    }
+  }
+
+  /* ---------- сборка цели из текста ---------- */
+  function buildTargets() {
+    var off = document.createElement("canvas");
+    off.width = W; off.height = H;
+    var g = off.getContext("2d");
+
+    // подгоняем кегль под ширину экрана
+    var size = H * 0.3;
+    g.font = "400 " + size + "px " + FONT;
+    var tw = g.measureText(TEXT).width;
+    var maxW = W * 0.88;
+    if (tw > maxW) size = size * (maxW / tw);
+    g.font = "400 " + size + "px " + FONT;
+    g.textAlign = "center";
+    g.textBaseline = "middle";
+    g.fillStyle = "#fff";
+    g.fillText(TEXT, W / 2, H / 2);
+
+    var data = g.getImageData(0, 0, W, H).data;
+    var maxCount = Math.min(4200, Math.max(600, Math.floor(W * H / 320)));
+
+    var step = 3, targets = [];
+    do {
+      targets = [];
+      for (var y = 0; y < H; y += step) {
+        for (var x = 0; x < W; x += step) {
+          if (data[(y * W + x) * 4 + 3] > 128) {
+            targets.push([x + (Math.random() - 0.5) * step,
+                          y + (Math.random() - 0.5) * step]);
+          }
+        }
+      }
+      step++;
+    } while (targets.length > maxCount && step < 12);
+
+    particles = targets.map(function (t) {
+      var hue = (t[0] / W) * 300 + 20;
+      return new Particle(t[0], t[1], hue);
+    });
+  }
+
+  function resize() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    cvs.width = W * DPR;
+    cvs.height = H * DPR;
+    cvs.style.width = W + "px";
+    cvs.style.height = H + "px";
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctx.fillStyle = "#050507";
+    ctx.fillRect(0, 0, W, H);
+    buildTargets();
+  }
+
+  var resizeTimer = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(resize, 200);
+  });
+
+  /* ---------- главный цикл ---------- */
+  var t = 0;
+  var HUE_DRIFT = 0.02; // радуга медленно ползёт по буквам
+  var SPRING = 0.012;
+  var FRICTION = 0.9;
+  var REPEL_R = 110;
+
+  function frame() {
+    t += 0.016;
+
+    // шлейфы: не стираем, а притеняем
+    ctx.globalCompositeOperation = "source-over";
+    ctx.fillStyle = "rgba(5, 5, 7, 0.32)";
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.globalCompositeOperation = "lighter";
+
+    for (var i = 0; i < particles.length; i++) {
+      var p = particles[i];
+
+      // пружина к букве
+      p.vx += (p.tx - p.x) * SPRING;
+      p.vy += (p.ty - p.y) * SPRING;
+
+      // отталкивание от курсора / пальца
+      if (pointer.active) {
+        var dx = p.x - pointer.x, dy = p.y - pointer.y;
+        var d2 = dx * dx + dy * dy;
+        if (d2 < REPEL_R * REPEL_R && d2 > 0.01) {
+          var d = Math.sqrt(d2);
+          var f = (1 - d / REPEL_R) * 3.2;
+          p.vx += (dx / d) * f;
+          p.vy += (dy / d) * f;
+        }
+      }
+
+      p.vx *= FRICTION;
+      p.vy *= FRICTION;
+      p.x += p.vx;
+      p.y += p.vy;
+
+      // лёгкое дыхание вокруг буквы
+      var wob = Math.sin(t * p.wSpeed + p.phase) * 1.4;
+
+      var hue = (p.hue + t * 22 * HUE_DRIFT * 50) % 360;
+      var sprite = sprites[Math.floor(hue / 360 * HUE_STEPS) % HUE_STEPS];
+      var drawSize = p.size * 7 + wob * 2;
+      var tw = 0.65 + 0.35 * Math.sin(t * 3 + p.phase * 2); // мерцание
+
+      ctx.globalAlpha = tw;
+      ctx.drawImage(sprite,
+        p.x - drawSize / 2, p.y - drawSize / 2,
+        drawSize, drawSize);
+    }
+
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(frame);
+  }
+
+  /* ---------- запуск: ждём шрифт, чтобы буквы не поплыли ---------- */
+  function start() {
+    resize();
+    frame();
+  }
+
+  if (document.fonts && document.fonts.load) {
+    Promise.race([
+      document.fonts.load('400 100px "Rubik Mono One"'),
+      new Promise(function (res) { setTimeout(res, 2000); })
+    ]).then(start).catch(start);
+  } else {
+    start();
+  }
+})();
 </script>
 </body>
 </html>
