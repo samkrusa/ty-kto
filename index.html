@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#050507">
+<meta name="theme-color" content="#03030a">
 <title>ТЫ кто?</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -18,35 +18,36 @@
   }
 
   body {
-    background: #050507;
+    background: #03030a;
     font-family: "Rubik Mono One", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     -webkit-tap-highlight-color: transparent;
     touch-action: none;
     cursor: crosshair;
   }
 
-  /* ---------- фоновая подсветка ---------- */
+  /* ---------- глубокий космос ---------- */
 
-  .aurora {
+  .nebula {
     position: fixed;
     inset: 0;
     background:
-      radial-gradient(55vmax 55vmax at 25% 20%, rgba(120, 60, 255, 0.18), transparent 65%),
-      radial-gradient(50vmax 50vmax at 80% 85%, rgba(255, 40, 100, 0.14), transparent 65%),
-      radial-gradient(60vmax 60vmax at 60% 50%, rgba(0, 180, 255, 0.10), transparent 70%);
-    animation: hue-drift 20s linear infinite;
+      radial-gradient(60vmax 40vmax at 18% 12%, rgba(88, 28, 205, 0.20), transparent 65%),
+      radial-gradient(50vmax 35vmax at 85% 80%, rgba(205, 16, 86, 0.16), transparent 65%),
+      radial-gradient(70vmax 50vmax at 55% 55%, rgba(8, 84, 200, 0.10), transparent 70%),
+      radial-gradient(40vmax 30vmax at 90% 15%, rgba(20, 190, 210, 0.07), transparent 65%);
+    animation: nebula-breathe 26s ease-in-out infinite alternate;
     pointer-events: none;
   }
 
-  @keyframes hue-drift {
-    0%   { filter: hue-rotate(0deg); }
-    100% { filter: hue-rotate(360deg); }
+  @keyframes nebula-breathe {
+    0%   { transform: scale(1) translate(0, 0); filter: hue-rotate(0deg) brightness(1); }
+    100% { transform: scale(1.12) translate(-2%, 2%); filter: hue-rotate(40deg) brightness(1.15); }
   }
 
   .vignette {
     position: fixed;
     inset: 0;
-    background: radial-gradient(130% 130% at 50% 50%, transparent 50%, rgba(0, 0, 0, 0.85) 100%);
+    background: radial-gradient(135% 135% at 50% 50%, transparent 42%, rgba(0, 0, 0, 0.88) 100%);
     pointer-events: none;
   }
 
@@ -54,7 +55,7 @@
     position: fixed;
     inset: -100%;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.5'/%3E%3C/svg%3E");
-    opacity: 0.05;
+    opacity: 0.045;
     animation: grain-shift 0.8s steps(4) infinite;
     pointer-events: none;
   }
@@ -91,22 +92,21 @@
 
   body.reduced .fallback { display: grid; }
   body.reduced canvas#stage,
-  body.reduced .aurora,
+  body.reduced .nebula,
   body.reduced .grain { display: none; }
 
-  /* подсказка снизу */
   .hint {
     position: fixed;
     left: 50%;
-    bottom: 6vh;
+    bottom: 2.5vh;
     transform: translateX(-50%);
-    color: rgba(255, 255, 255, 0.35);
+    color: rgba(255, 255, 255, 0.3);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    font-size: clamp(0.7rem, 2.2vmin, 1rem);
-    letter-spacing: 0.35em;
+    font-size: clamp(0.65rem, 2vmin, 0.9rem);
+    letter-spacing: 0.4em;
     text-transform: uppercase;
     white-space: nowrap;
-    animation: hint-fade 3s 2s both;
+    animation: hint-fade 3s 2.5s both;
     pointer-events: none;
   }
 
@@ -118,15 +118,15 @@
   body.reduced .hint { animation: none; opacity: 1; }
 
   @media (prefers-reduced-motion: reduce) {
-    .grain, .aurora { animation: none; }
+    .grain, .nebula { animation: none; }
   }
 </style>
 </head>
 <body>
-  <div class="aurora" aria-hidden="true"></div>
+  <div class="nebula" aria-hidden="true"></div>
   <canvas id="stage" aria-hidden="true"></canvas>
   <h1 class="fallback">ТЫ кто?</h1>
-  <div class="hint" id="hint" aria-hidden="true">коснись — и всё изменится</div>
+  <div class="hint" id="hint" aria-hidden="true">коснись</div>
   <div class="grain" aria-hidden="true"></div>
   <div class="vignette" aria-hidden="true"></div>
 
@@ -147,44 +147,86 @@
   var TEXT = "ТЫ кто?";
   var FONT = '"Rubik Mono One", sans-serif';
 
-  /* ---------- свечения-спрайты по оттенкам ---------- */
-  var HUE_STEPS = 36;
+  var QUALITY = 1;          // адаптив: падает при лагах
+  var emaDt = 16;           // экспоненциальное среднее времени кадра
+
+  /* ---------- спрайты свечения ---------- */
+  var HUE_STEPS = 48;
   var sprites = [];
-  (function makeSprites() {
-    for (var i = 0; i < HUE_STEPS; i++) {
-      var h = i * (360 / HUE_STEPS);
-      var s = document.createElement("canvas");
-      s.width = s.height = 64;
-      var g = s.getContext("2d");
-      var grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-      grad.addColorStop(0, "rgba(255,255,255,1)");
-      grad.addColorStop(0.25, "hsla(" + h + ",95%,72%,0.9)");
-      grad.addColorStop(0.6, "hsla(" + h + ",95%,60%,0.25)");
-      grad.addColorStop(1, "hsla(" + h + ",95%,55%,0)");
-      g.fillStyle = grad;
-      g.fillRect(0, 0, 64, 64);
-      sprites.push(s);
-    }
-  })();
+  var coreSprite = null;
 
-  /* ---------- частицы ---------- */
-  var particles = [];
-
-  function Particle(tx, ty, fromX, fromY) {
-    this.tx = tx; this.ty = ty;
-    this.hue = (tx / Math.max(1, W)) * 300 + 20;
-    this.phase = Math.random() * Math.PI * 2;
-    this.wSpeed = 0.5 + Math.random() * 1.5;
-    // стартовая точка: извне или рядом со старой позицией
-    this.x = fromX !== undefined ? fromX : Math.random() * W;
-    this.y = fromY !== undefined ? fromY : Math.random() * H;
-    this.vx = 0;
-    this.vy = 0;
-    this.size = 2.5 + Math.random() * 3.5;
+  function makeSprite(h) {
+    var s = document.createElement("canvas");
+    s.width = s.height = 64;
+    var g = s.getContext("2d");
+    var grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0,    "hsla(" + h + ",100%,88%,0.9)");
+    grad.addColorStop(0.22, "hsla(" + h + ",95%,68%,0.55)");
+    grad.addColorStop(0.55, "hsla(" + h + ",95%,58%,0.18)");
+    grad.addColorStop(1,    "hsla(" + h + ",95%,55%,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+    return s;
   }
 
-  /* ---------- указатель ---------- */
+  (function makeSprites() {
+    for (var i = 0; i < HUE_STEPS; i++) {
+      sprites.push(makeSprite(i * (360 / HUE_STEPS)));
+    }
+    coreSprite = document.createElement("canvas");
+    coreSprite.width = coreSprite.height = 64;
+    var g = coreSprite.getContext("2d");
+    var grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+    grad.addColorStop(0, "rgba(255,255,255,1)");
+    grad.addColorStop(0.35, "rgba(255,255,255,0.5)");
+    grad.addColorStop(1, "rgba(255,255,255,0)");
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 64, 64);
+  })();
+
+  /* ---------- звёздный фон: три слоя параллакса ---------- */
+  var stars = [];
+  var STAR_LAYERS = [
+    { n: 90,  size: [0.6, 1.2], speed: 0.06, parallax: 0.010 },
+    { n: 50,  size: [1.0, 1.8], speed: 0.12, parallax: 0.022 },
+    { n: 22,  size: [1.6, 2.6], speed: 0.22, parallax: 0.040 }
+  ];
+
+  function makeStars() {
+    stars = [];
+    STAR_LAYERS.forEach(function (L) {
+      for (var i = 0; i < L.n; i++) {
+        stars.push({
+          x: Math.random() * W,
+          y: Math.random() * H,
+          size: L.size[0] + Math.random() * (L.size[1] - L.size[0]),
+          speed: L.speed,
+          parallax: L.parallax,
+          tw: Math.random() * Math.PI * 2,
+          twS: 0.5 + Math.random() * 2.5
+        });
+      }
+    });
+  }
+
+  /* ---------- падающие звёзды ---------- */
+  var meteors = [];
+  function spawnMeteor() {
+    var fromLeft = Math.random() < 0.5;
+    meteors.push({
+      x: fromLeft ? -80 : W + 80,
+      y: Math.random() * H * 0.45,
+      vx: (fromLeft ? 1 : -1) * (6 + Math.random() * 6),
+      vy: 2 + Math.random() * 3,
+      life: 1,
+      decay: 0.006 + Math.random() * 0.004
+    });
+  }
+  var meteorTimer = 2 + Math.random() * 4;
+
+  /* ---------- указатель: позиция + кома ---------- */
   var pointer = { x: -1e9, y: -1e9, active: false };
+  var trail = []; // последние точки для светящейся комы
 
   function setPointer(e) {
     pointer.x = e.clientX;
@@ -192,26 +234,45 @@
     pointer.active = true;
   }
   window.addEventListener("pointermove", setPointer, { passive: true });
+  window.addEventListener("pointerleave", function () { pointer.active = false; });
+
+  /* ---------- ударные волны от клика ---------- */
+  var waves = [];
   window.addEventListener("pointerdown", function (e) {
     setPointer(e);
     explode(e.clientX, e.clientY);
+    waves.push({ x: e.clientX, y: e.clientY, r: 10, v: 22, a: 1 });
+    waves.push({ x: e.clientX, y: e.clientY, r: 4,  v: 13, a: 0.7, delay: 6 });
   }, { passive: true });
-  window.addEventListener("pointerleave", function () { pointer.active = false; });
+
+  /* ---------- частицы ---------- */
+  var particles = [];
+
+  function Particle(tx, ty, fromX, fromY) {
+    this.tx = tx; this.ty = ty;
+    this.hue = (tx / Math.max(1, W)) * 280 + 15;
+    this.phase = Math.random() * Math.PI * 2;
+    this.wSpeed = 0.5 + Math.random() * 1.5;
+    this.x = fromX !== undefined ? fromX : Math.random() * W;
+    this.y = fromY !== undefined ? fromY : Math.random() * H;
+    this.vx = 0;
+    this.vy = 0;
+    this.size = 2 + Math.random() * 3;
+  }
 
   function explode(px, py) {
     for (var i = 0; i < particles.length; i++) {
       var p = particles[i];
       var dx = p.x - px, dy = p.y - py;
       var d = Math.max(20, Math.sqrt(dx * dx + dy * dy));
-      var force = 2200 / d;
-      p.vx += (dx / d) * force;
-      p.vy += (dy / d) * force;
+      var force = 2600 / d;
+      p.vx += (dx / d) * force + (Math.random() - 0.5) * 6;
+      p.vy += (dy / d) * force + (Math.random() - 0.5) * 6;
     }
   }
 
-  /* ---------- отрисовка фигур в оффскрин-канвас ---------- */
+  /* ---------- фигуры ---------- */
 
-  // текст «ТЫ кто?» — в верхней половине экрана
   function drawText(g) {
     var size = H * 0.16;
     g.font = "400 " + size + "px " + FONT;
@@ -225,13 +286,12 @@
     g.fillText(TEXT, W / 2, H * 0.34);
   }
 
-  // мультяшная фигура внизу экрана
   function drawDoodle(g) {
     var cx = W / 2;
-    var TH = Math.min(H * 0.34, W * 0.6);  // высота фигуры в нижней зоне
-    var SW = TH * 0.42;                     // ширина ствола
+    var TH = Math.min(H * 0.34, W * 0.6);
+    var SW = TH * 0.42;
 
-    var base = H * 0.92;                    // нижняя граница фигуры
+    var base = H * 0.92;
     var headCy = base - TH * 0.86;
     var shaftTop = base - TH * 0.76;
     var shaftBot = base - TH * 0.3;
@@ -242,22 +302,18 @@
     g.lineWidth = SW * 0.18;
     g.lineJoin = "round";
 
-    // головка
     g.beginPath();
     g.ellipse(cx, headCy, SW * 0.55, TH * 0.14, 0, 0, Math.PI * 2);
     g.fill();
 
-    // ствол
     g.beginPath();
     g.rect(cx - SW / 2, shaftTop, SW, shaftBot - shaftTop);
     g.fill();
 
-    // основание — скругление перехода
     g.beginPath();
     g.ellipse(cx, shaftBot, SW / 2, TH * 0.05, 0, 0, Math.PI * 2);
     g.fill();
 
-    // яйца — два круга
     g.beginPath();
     g.arc(cx - SW * 0.62, ballCy, SW * 0.58, 0, Math.PI * 2);
     g.fill();
@@ -266,10 +322,9 @@
     g.fill();
   }
 
-  // сэмплирование альфы в список точек-целей
   function sampleTargets(g) {
     var data = g.getImageData(0, 0, W, H).data;
-    var maxCount = Math.min(4200, Math.max(600, Math.floor(W * H / 320)));
+    var maxCount = Math.floor(Math.min(5200, Math.max(700, W * H / 260)) * QUALITY);
 
     var step = 3, targets = [];
     do {
@@ -283,13 +338,12 @@
         }
       }
       step++;
-    } while (targets.length > maxCount && step < 12);
+    } while (targets.length > maxCount && step < 14);
 
     return targets;
   }
 
-  // обе фигуры рисуются одновременно: текст + фигура внизу
-  function retarget() {
+  function retarget(keepPositions) {
     var off = document.createElement("canvas");
     off.width = W; off.height = H;
     var g = off.getContext("2d");
@@ -301,16 +355,14 @@
     for (i = 0; i < particles.length && i < targets.length; i++) {
       particles[i].tx = targets[i][0];
       particles[i].ty = targets[i][1];
-      particles[i].hue = (targets[i][0] / Math.max(1, W)) * 300 + 20;
+      particles[i].hue = (targets[i][0] / Math.max(1, W)) * 280 + 15;
     }
-    // недостающие частицы влетают извне экрана
     for (; i < targets.length; i++) {
       var edge = Math.floor(Math.random() * 4);
-      var fromX = edge === 0 ? -50 : edge === 1 ? W + 50 : Math.random() * W;
-      var fromY = edge === 2 ? -50 : edge === 3 ? H + 50 : Math.random() * H;
+      var fromX = edge === 0 ? -60 : edge === 1 ? W + 60 : Math.random() * W;
+      var fromY = edge === 2 ? -60 : edge === 3 ? H + 60 : Math.random() * H;
       particles.push(new Particle(targets[i][0], targets[i][1], fromX, fromY));
     }
-    // лишние убираем
     if (particles.length > targets.length) {
       particles.length = targets.length;
     }
@@ -325,8 +377,9 @@
     cvs.style.width = W + "px";
     cvs.style.height = H + "px";
     ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    ctx.fillStyle = "#050507";
+    ctx.fillStyle = "#03030a";
     ctx.fillRect(0, 0, W, H);
+    makeStars();
     particles = [];
     retarget();
   }
@@ -339,37 +392,117 @@
 
   /* ---------- главный цикл ---------- */
   var t = 0;
-  var HUE_DRIFT = 0.02;
-  var SPRING = 0.012;
+  var lastFrame = performance.now();
+  var SPRING = 0.014;
   var FRICTION = 0.9;
-  var REPEL_R = 110;
+  var REPEL_R = 120;
 
-  function frame() {
+  function frame(now) {
+    var dt = now - lastFrame;
+    lastFrame = now;
     t += 0.016;
 
-    // шлейфы: не стираем, а притеняем
+    // адаптивное качество
+    emaDt = emaDt * 0.95 + Math.min(dt, 80) * 0.05;
+    if (emaDt > 26 && QUALITY > 0.45) {
+      QUALITY = 0.45;
+      retarget(true);
+    } else if (emaDt < 18 && QUALITY < 1) {
+      QUALITY = 1;
+      retarget(true);
+    }
+
+    // фейд-шлейф
     ctx.globalCompositeOperation = "source-over";
-    ctx.fillStyle = "rgba(5, 5, 7, 0.32)";
+    ctx.fillStyle = "rgba(3, 3, 10, 0.30)";
     ctx.fillRect(0, 0, W, H);
 
     ctx.globalCompositeOperation = "lighter";
 
+    /* --- звёзды --- */
+    var px = pointer.active ? pointer.x - W / 2 : 0;
+    var py = pointer.active ? pointer.y - H / 2 : 0;
+    for (var s = 0; s < stars.length; s++) {
+      var st = stars[s];
+      st.y += st.speed;
+      if (st.y > H + 4) { st.y = -4; st.x = Math.random() * W; }
+      var tw = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(t * st.twS + st.tw));
+      var ox = st.x - px * st.parallax;
+      var oy = st.y - py * st.parallax;
+      ctx.globalAlpha = tw * 0.7;
+      var sSize = st.size * 4;
+      ctx.drawImage(coreSprite, ox - sSize / 2, oy - sSize / 2, sSize, sSize);
+    }
+
+    /* --- падающие звёзды --- */
+    meteorTimer -= 0.016;
+    if (meteorTimer <= 0) { spawnMeteor(); meteorTimer = 3 + Math.random() * 6; }
+    for (var m = meteors.length - 1; m >= 0; m--) {
+      var mt = meteors[m];
+      mt.x += mt.vx; mt.y += mt.vy;
+      mt.life -= mt.decay;
+      if (mt.life <= 0 || mt.x < -150 || mt.x > W + 150 || mt.y > H + 50) {
+        meteors.splice(m, 1);
+        continue;
+      }
+      var tailX = mt.x - mt.vx * 9;
+      var tailY = mt.y - mt.vy * 9;
+      var grad = ctx.createLinearGradient(tailX, tailY, mt.x, mt.y);
+      grad.addColorStop(0, "rgba(255,255,255,0)");
+      grad.addColorStop(1, "rgba(255,255,255," + (0.8 * mt.life) + ")");
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = 1.6;
+      ctx.globalAlpha = mt.life;
+      ctx.beginPath();
+      ctx.moveTo(tailX, tailY);
+      ctx.lineTo(mt.x, mt.y);
+      ctx.stroke();
+      var hs = 10 + 8 * mt.life;
+      ctx.drawImage(coreSprite, mt.x - hs / 2, mt.y - hs / 2, hs, hs);
+    }
+
+    /* --- кома курсора --- */
+    if (pointer.active) {
+      trail.push({ x: pointer.x, y: pointer.y });
+      if (trail.length > 14) trail.shift();
+      for (var tr = 0; tr < trail.length; tr++) {
+        var pt = trail[tr];
+        var f = tr / trail.length;
+        var tsz = (10 + f * 26) * (0.5 + 0.5 * f);
+        ctx.globalAlpha = 0.10 * f + 0.04;
+        ctx.drawImage(coreSprite, pt.x - tsz / 2, pt.y - tsz / 2, tsz, tsz);
+      }
+    } else if (trail.length) {
+      trail.shift();
+    }
+
+    /* --- пробегающий блик по тексту --- */
+    var sweepX = ((t * 0.22) % 1.6 - 0.3) * W;
+
+    /* --- частицы --- */
     for (var i = 0; i < particles.length; i++) {
       var p = particles[i];
 
-      // пружина к цели
-      p.vx += (p.tx - p.x) * SPRING;
-      p.vy += (p.ty - p.y) * SPRING;
+      // цель «дышит» волной
+      var wob = Math.sin(p.tx * 0.012 + t * 1.1 + p.phase * 0.3);
+      var wob2 = Math.cos(p.ty * 0.014 + t * 0.9);
+      var gx = p.tx + wob * 4;
+      var gy = p.ty + wob2 * 5;
 
-      // отталкивание от курсора / пальца
+      p.vx += (gx - p.x) * SPRING;
+      p.vy += (gy - p.y) * SPRING;
+
+      // курсор: отталкивание + вихрь (закрутка)
       if (pointer.active) {
         var dx = p.x - pointer.x, dy = p.y - pointer.y;
         var d2 = dx * dx + dy * dy;
         if (d2 < REPEL_R * REPEL_R && d2 > 0.01) {
           var d = Math.sqrt(d2);
-          var f = (1 - d / REPEL_R) * 3.2;
-          p.vx += (dx / d) * f;
-          p.vy += (dy / d) * f;
+          var near = 1 - d / REPEL_R;
+          var f = near * 3.0;
+          var nx = dx / d, ny = dy / d;
+          p.vx += nx * f - ny * near * 1.6; // радиально + тангенциально
+          p.vy += ny * f + nx * near * 1.6;
         }
       }
 
@@ -378,27 +511,62 @@
       p.x += p.vx;
       p.y += p.vy;
 
-      var wob = Math.sin(t * p.wSpeed + p.phase) * 1.4;
+      // блик: частицы рядом с фронтом вспыхивают и увеличиваются
+      var sweepDist = Math.abs(p.x - sweepX);
+      var sweepBoost = Math.exp(-sweepDist * sweepDist / 8000);
 
-      var hue = (p.hue + t * HUE_DRIFT * 50) % 360;
-      var sprite = sprites[Math.floor(hue / 360 * HUE_STEPS) % HUE_STEPS];
-      var drawSize = p.size * 7 + wob * 2;
-      var tw = 0.65 + 0.35 * Math.sin(t * 3 + p.phase * 2);
+      var hue = (p.hue + t * 14) % 360;
+      var sprite = sprites[(Math.floor(hue / 360 * HUE_STEPS) + HUE_STEPS) % HUE_STEPS];
+      var drawSize = (p.size * 6.5 + wob * 2) * (1 + sweepBoost * 1.2);
+      var alpha = 0.5 + 0.35 * (0.5 + 0.5 * Math.sin(t * 2.4 + p.phase * 2)) + sweepBoost * 0.5;
 
-      ctx.globalAlpha = tw;
-      ctx.drawImage(sprite,
-        p.x - drawSize / 2, p.y - drawSize / 2,
-        drawSize, drawSize);
+      ctx.globalAlpha = Math.min(alpha, 1);
+      ctx.drawImage(sprite, p.x - drawSize / 2, p.y - drawSize / 2, drawSize, drawSize);
+
+      // яркая сердцевина у крупных частиц
+      if (p.size > 4 || sweepBoost > 0.4) {
+        var cSize = p.size * 2.2 * (1 + sweepBoost);
+        ctx.globalAlpha = Math.min(0.8 * alpha, 1);
+        ctx.drawImage(coreSprite, p.x - cSize / 2, p.y - cSize / 2, cSize, cSize);
+      }
+    }
+
+    /* --- ударные волны --- */
+    for (var w = waves.length - 1; w >= 0; w--) {
+      var wv = waves[w];
+      if (wv.delay > 0) { wv.delay -= 1; continue; }
+      wv.r += wv.v;
+      wv.v *= 0.965;
+      wv.a *= 0.955;
+      if (wv.a < 0.02 || wv.r > Math.max(W, H) * 1.2) {
+        waves.splice(w, 1);
+        continue;
+      }
+      ctx.globalAlpha = wv.a;
+      ctx.strokeStyle = "rgba(180, 200, 255, 1)";
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(wv.x, wv.y, wv.r, 0, Math.PI * 2);
+      ctx.stroke();
+      // мягкий широкий ореол кольца
+      ctx.globalAlpha = wv.a * 0.35;
+      ctx.lineWidth = 12;
+      ctx.beginPath();
+      ctx.arc(wv.x, wv.y, wv.r * 0.92, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
     ctx.globalAlpha = 1;
     requestAnimationFrame(frame);
   }
 
-  /* ---------- запуск: ждём шрифт, чтобы буквы не поплыли ---------- */
+  /* ---------- запуск ---------- */
   function start() {
     resize();
-    frame();
+    requestAnimationFrame(function (now) {
+      lastFrame = now;
+      frame(now);
+    });
   }
 
   if (document.fonts && document.fonts.load) {
